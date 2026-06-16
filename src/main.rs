@@ -1,7 +1,8 @@
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use roundtable::{
-    build_digest, current_iso_week, dedup_check, find_columns_since, iso_week_from_date,
+    build_digest, cadence::{default_cadence_path, load_or_default, weekday_of},
+    current_iso_week, dedup_check, find_columns_since, iso_week_from_date,
     last_issue_date, parse_table, read_bon_mot_for_date, read_column_headline, resolve_tool,
     run_game, run_stage, BonMotSummary, DigestJson, Game, Opponent,
 };
@@ -16,6 +17,7 @@ fn main() -> Result<()> {
         Commands::Bind(args) => run_bind(args),
         Commands::Games(args) => run_games(args),
         Commands::Weekly(args) => run_weekly(args),
+        Commands::Cadence(args) => run_cadence(args),
     }
 }
 
@@ -38,6 +40,8 @@ enum Commands {
     Games(GamesArgs),
     /// Build and display a weekly digest across all sources
     Weekly(WeeklyArgs),
+    /// Manage the publication cadence schedule
+    Cadence(CadenceArgs),
 }
 
 #[derive(Parser)]
@@ -128,6 +132,28 @@ struct WeeklyArgs {
     /// Output format: text (default), markdown, or json
     #[arg(long, default_value = "text")]
     format: String,
+}
+
+#[derive(Parser)]
+struct CadenceArgs {
+    #[command(subcommand)]
+    subcommand: CadenceSubcommand,
+}
+
+#[derive(Subcommand)]
+enum CadenceSubcommand {
+    /// Display the current cadence configuration
+    Show {
+        /// Output format: text (default) or json
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
+    /// Show the next session, bind, and digest dates
+    Next {
+        /// Start date in YYYY-MM-DD format (default: today)
+        #[arg(long)]
+        from: Option<String>,
+    },
 }
 
 fn today_date() -> Result<String> {
@@ -495,6 +521,51 @@ fn run_weekly(args: WeeklyArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn run_cadence(args: CadenceArgs) -> Result<()> {
+    match args.subcommand {
+        CadenceSubcommand::Show { format } => {
+            let cadence = load_or_default()?;
+            let path = default_cadence_path();
+            match format.as_str() {
+                "json" => {
+                    let json = serde_json::to_string_pretty(&cadence)
+                        .context("serialising cadence")?;
+                    println!("{json}");
+                }
+                _ => {
+                    let session_days: Vec<String> =
+                        cadence.session_days.iter().map(|d| d.to_string()).collect();
+                    println!("cadence config: {}", path.display());
+                    println!("session days:   {}", session_days.join(", "));
+                    println!("bind day:       {}", cadence.bind_day);
+                    println!("digest day:     {}", cadence.digest_day);
+                    println!("games enabled:  {}", cadence.games_enabled);
+                }
+            }
+            Ok(())
+        }
+        CadenceSubcommand::Next { from } => {
+            let from_date = match from {
+                Some(d) => d,
+                None => today_date()?,
+            };
+            // Validate date format
+            weekday_of(&from_date)
+                .with_context(|| format!("invalid from-date: {from_date}"))?;
+
+            let cadence = load_or_default()?;
+            let next_session = cadence.next_session(&from_date)?;
+            let next_bind = cadence.next_bind(&from_date)?;
+            let next_digest = cadence.next_digest(&from_date)?;
+
+            println!("next session: {next_session}");
+            println!("next bind:    {next_bind}");
+            println!("next digest:  {next_digest}");
+            Ok(())
+        }
+    }
 }
 
 fn resolve_bin(tool: &str, env_var: &str, bin_dir: Option<&Path>) -> Result<PathBuf> {
