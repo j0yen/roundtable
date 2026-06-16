@@ -1,0 +1,6 @@
+[Unit]
+Description=Roundtable daily session
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/roundtable session --with-games

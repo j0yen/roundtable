@@ -1,0 +1,6 @@
+[Unit]
+Description=Roundtable weekly bind
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/roundtable bind
