@@ -1,0 +1,19 @@
+{
+  "src/main.rs": "edit-agent",
+  "src/session.rs": "edit-agent",
+  "src/table.rs": "edit-agent",
+  "src/ledger.rs": "edit-agent",
+  "tests/acceptance_ac1.rs": "readonly",
+  "tests/acceptance_ac2.rs": "readonly",
+  "tests/acceptance_ac3.rs": "readonly",
+  "tests/acceptance_ac4.rs": "readonly",
+  "tests/acceptance_ac5.rs": "readonly",
+  "tests/acceptance_ac6.rs": "readonly",
+  "tests/acceptance_ac7.rs": "readonly",
+  "tests/proptest_invariants.rs": "readonly",
+  "scripts/run-metrics.sh": "readonly",
+  "scripts/risk-gate.sh": "readonly",
+  "scripts/audit.sh": "readonly",
+  "Cargo.toml": "edit-agent",
+  "agent/intent-card.json": "readonly"
+}

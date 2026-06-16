@@ -1,0 +1,125 @@
+{
+  "schema": "autobuilder.intent_card.v1",
+  "prd_source": "/home/jsy/wintermute/autobuilder/PRD-roundtable-session.md",
+  "intent_slug": "roundtable-session",
+  "root_motivation": "Six creative sub-systems (`the-lunch`, `vicious-circle`, `conning-tower`) each ship a clean CLI, but no convener ever wires them together into a single daily session. The user has to manually run each step. `roundtable session` is the missing wire: one command, one daily creative loop, fail-loud on any broken link.",
+  "user_persona": "Joe Yen running `roundtable session` daily (automated or manual) on his wintermute laptop, expecting a single command to convene the table, run critique on each artifact, and publish the day's column.",
+  "unfakeable_metric": {
+    "name": "acceptance_tests_passing_count",
+    "lower_is_better": false,
+    "harness_command": "scripts/run-metrics.sh",
+    "target": 7
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "level": "MUST",
+      "description": "`cargo test --release` passes; `cargo clippy -- -D warnings` passes in the repo.",
+      "test": "tests/acceptance_ac1.rs"
+    },
+    {
+      "id": "AC2",
+      "level": "MUST",
+      "description": "`roundtable session --dry-run --date 2026-06-15` prints the ordered stage plan and mutates nothing (no ledger/columns writes).",
+      "test": "tests/acceptance_ac2.rs"
+    },
+    {
+      "id": "AC3",
+      "level": "MUST",
+      "description": "With stub binaries on `--bin-dir`, `roundtable session` runs the full chain and prints a summary naming the crowned line and column destination.",
+      "test": "tests/acceptance_ac3.rs"
+    },
+    {
+      "id": "AC4",
+      "level": "MUST",
+      "description": "A missing required binary makes `roundtable session` exit non-zero with a message naming the missing tool.",
+      "test": "tests/acceptance_ac4.rs"
+    },
+    {
+      "id": "AC5",
+      "level": "MUST",
+      "description": "A stage failure (stub exits non-zero) makes `session` exit non-zero and name the failed stage.",
+      "test": "tests/acceptance_ac5.rs"
+    },
+    {
+      "id": "AC6",
+      "level": "MUST",
+      "description": "Re-running `session` for the same date does not double-record an artifact already in the ledger (dedup on artifact path + date).",
+      "test": "tests/acceptance_ac6.rs"
+    },
+    {
+      "id": "AC7",
+      "level": "MUST",
+      "description": "`roundtable session` over an empty table (no dishes) completes cleanly, reports 'no artifacts on the table today,' and exits 0.",
+      "test": "tests/acceptance_ac7.rs"
+    }
+  ],
+  "scope": [
+    "Orchestrate the-lunch, vicious-circle, conning-tower via subprocess invocation",
+    "Resolve tool binaries from PATH or --bin-dir override or per-tool env vars",
+    "Dedup artifact entries in the vicious-circle ledger by artifact path + date",
+    "Parse table.json to enumerate artifacts with present==true",
+    "Fail-loud with stage name on any subprocess failure",
+    "--dry-run prints plan without executing mutating stages",
+    "Summary output: N artifacts critiqued, crowned bon mot, column destination"
+  ],
+  "non_goals": [
+    "Re-implementing any critique, scoring, or composition logic (stays in existing binaries)",
+    "Providing a TUI or interactive mode",
+    "Managing scheduling or cron setup",
+    "Supporting targets other than 'columns' for syndication",
+    "Storing its own state beyond what the-lunch/vicious-circle/conning-tower already persist"
+  ],
+  "hard_constraints": {
+    "rust_edition": "2021",
+    "target_kind": "cli",
+    "deny_unsafe": true,
+    "msrv": "1.85",
+    "max_deps": null,
+    "additional": {
+      "no_reimplementation": "Heavy logic stays in existing binaries; this crate is orchestration only"
+    }
+  },
+  "five_whys_trace": [
+    {
+      "why": 1,
+      "q": "Why do you need a new binary if all six sub-systems already exist?",
+      "a": "Each sub-system stops at its own boundary. `the-lunch lunch` sets the table and stops; nothing feeds the artifacts into `vicious-circle record` or chains into `conning-tower`. The user must manually stitch them."
+    },
+    {
+      "why": 2,
+      "q": "Why can't you add a `session` subcommand to one of the existing tools?",
+      "a": "Each tool's domain is narrow and well-defined. The umbrella orchestration does not belong to any one of them — it's cross-cutting, and putting it in `the-lunch` or `conning-tower` would violate their single-responsibility design."
+    },
+    {
+      "why": 3,
+      "q": "Why does the orchestration need to be a persistent binary rather than a shell script?",
+      "a": "Shell scripts lack structured error reporting (named stage failures), dedup logic for the ledger, and testable acceptance criteria. The PRD mandates fail-loud stage naming and idempotency — those need unit tests, not bash."
+    },
+    {
+      "why": 4,
+      "q": "Why is dedup (not double-recording artifacts) important?",
+      "a": "The ledger is append-only JSONL. Running `session` twice for the same date without dedup would produce duplicate critique rounds, polluting the column composition and the crowned-line count."
+    },
+    {
+      "why": 5,
+      "q": "Why must all six stages succeed or the command fails loudly, rather than continuing past a failure?",
+      "a": "Silent partial success would produce an incomplete or corrupt column (e.g., some artifacts critiqued, compose runs on partial data). The user needs to know exactly which stage broke so they can fix it and re-run."
+    }
+  ],
+  "ambiguities_resolved": [
+    {
+      "question": "What's the ledger path for vicious-circle when called from roundtable?",
+      "resolution": "Pass --ledger explicitly to vicious-circle record and conning-tower compose/syndicate using $XDG_DATA_HOME/vicious-circle/ledger.jsonl as the default (same as vicious-circle's own default), but allow override via ROUNDTABLE_LEDGER env var."
+    },
+    {
+      "question": "What does 'crowned line' mean in the summary output?",
+      "resolution": "The crowned bon mot: after vicious-circle record runs, the ledger entry for each artifact has a crowned field. roundtable reads the last-written entry's crowned text for the summary."
+    },
+    {
+      "question": "How does roundtable know which artifacts are 'present' on the table?",
+      "resolution": "Parse table.json: filter dishes where present == true and provenance.artifact_path is Some. Empty-seat dishes (present == false) are skipped."
+    }
+  ],
+  "created_at": "2026-06-15T12:00:00Z"
+}
